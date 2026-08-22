@@ -1,0 +1,858 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>سجل — توثيق المرضى</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@500;700;800&family=Tajawal:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+
+  :root{
+    --bg:#F3F6F5;
+    --surface:#FFFFFF;
+    --primary:#0F3336;
+    --primary-light:#1F5F63;
+    --primary-dark:#0A2426;
+    --accent:#C97B3D;
+    --accent-light:#E8A263;
+    --after:#4C8C7A;
+    --text:#16262A;
+    --muted:#6B8079;
+    --border:#E1E8E5;
+    --danger:#B3462C;
+    --shadow-sm: 0 1px 2px rgba(15,51,54,.06);
+    --shadow-md: 0 4px 16px rgba(15,51,54,.08);
+    --shadow-lg: 0 12px 32px rgba(15,51,54,.14);
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; background:var(--bg); color:var(--text);
+    font-family:'Tajawal', sans-serif;
+    min-height:100vh;
+    -webkit-font-smoothing:antialiased;
+  }
+  h1,h2,h3,.display{ font-family:'Cairo', sans-serif; letter-spacing:-.01em; }
+  button{ font-family:'Tajawal', sans-serif; cursor:pointer; }
+  input, select, textarea{ font-family:'Tajawal', sans-serif; }
+  input:focus, select:focus, textarea:focus{ outline:none; border-color:var(--primary-light) !important; box-shadow:0 0 0 3px rgba(31,95,99,.12); }
+
+  .app{ display:flex; min-height:100vh; }
+
+  /* Sidebar */
+  .sidebar{
+    width:230px; background:linear-gradient(175deg, var(--primary), var(--primary-dark)); color:#fff;
+    padding:26px 18px; flex-shrink:0;
+    display:flex; flex-direction:column; gap:28px;
+  }
+  .brand{ display:flex; align-items:center; gap:10px; }
+  .brand-mark{
+    width:36px; height:36px; border-radius:10px; background:var(--accent);
+    display:flex; align-items:center; justify-content:center;
+    font-family:'Cairo'; font-weight:800; color:#fff; font-size:17px;
+    box-shadow:0 3px 10px rgba(201,123,61,.4);
+  }
+  .brand-name{ font-family:'Cairo'; font-weight:800; font-size:20px; letter-spacing:-.02em; }
+  .nav-item{
+    padding:11px 13px; border-radius:9px; color:#B9D2CC; font-weight:600;
+    display:flex; align-items:center; gap:10px; font-size:14.5px;
+  }
+  .nav-item.active{ background:rgba(255,255,255,.13); color:#fff; }
+  .doctor-card{
+    margin-top:auto; padding:14px; background:rgba(255,255,255,.07);
+    border:1px solid rgba(255,255,255,.08);
+    border-radius:12px; font-size:13px; line-height:1.6;
+  }
+  .doctor-card b{ display:block; font-family:'Cairo'; font-size:14.5px; color:#fff; }
+  .logout-btn{
+    background:none; border:1px solid rgba(255,255,255,.22); color:#B9D2CC;
+    padding:7px 10px; border-radius:7px; font-size:12.5px; margin-top:10px; width:100%;
+    transition:.15s;
+  }
+  .logout-btn:hover{ background:rgba(255,255,255,.08); color:#fff; }
+
+  .main{ flex:1; padding:36px 44px; max-width:1140px; }
+  .topbar{ display:flex; justify-content:space-between; align-items:center; margin-bottom:28px; }
+  .page-title{ font-size:25px; font-weight:800; margin:0; }
+  .page-sub{ color:var(--muted); font-size:13.5px; margin-top:4px; }
+
+  .btn{
+    background:var(--primary); color:#fff; border:none; padding:11px 21px;
+    border-radius:10px; font-weight:700; font-size:14px; display:inline-flex;
+    align-items:center; gap:8px; transition:.15s; box-shadow:var(--shadow-sm);
+  }
+  .btn:hover{ background:var(--primary-light); transform:translateY(-1px); box-shadow:var(--shadow-md); }
+  .btn.secondary{ background:var(--surface); color:var(--primary); border:1.5px solid var(--border); box-shadow:none; }
+  .btn.secondary:hover{ border-color:var(--primary-light); background:var(--bg); transform:none; }
+  .btn.accent{ background:var(--accent); }
+  .btn.accent:hover{ background:var(--accent-light); }
+  .btn.ghost{ background:none; color:var(--primary); padding:8px 10px; box-shadow:none; }
+  .btn:disabled{ opacity:.55; cursor:not-allowed; transform:none; }
+
+  .search-bar{
+    display:flex; gap:10px; margin-bottom:22px;
+  }
+  .search-bar input{
+    flex:1; padding:12px 16px; border-radius:10px; border:1.5px solid var(--border);
+    font-size:14px; background:var(--surface); box-shadow:var(--shadow-sm);
+  }
+
+  .patient-grid{ display:grid; grid-template-columns:repeat(auto-fill, minmax(230px,1fr)); gap:16px; }
+  .patient-card{
+    background:var(--surface); border:1.5px solid var(--border); border-radius:16px;
+    padding:18px; cursor:pointer; transition:.18s; box-shadow:var(--shadow-sm);
+  }
+  .patient-card:hover{ border-color:var(--primary-light); transform:translateY(-3px); box-shadow:var(--shadow-md); }
+  .patient-avatar{
+    width:46px; height:46px; border-radius:50%;
+    background:linear-gradient(135deg, var(--primary-light), var(--primary));
+    display:flex; align-items:center; justify-content:center; font-family:'Cairo';
+    font-weight:700; color:#fff; margin-bottom:12px; font-size:17px;
+  }
+  .patient-name{ font-weight:700; font-size:15.5px; }
+  .patient-meta{ color:var(--muted); font-size:12.5px; margin-top:3px; }
+  .patient-count{
+    margin-top:10px; font-size:12px; color:var(--primary); font-weight:700;
+  }
+
+  .empty-state{
+    text-align:center; padding:70px 20px; color:var(--muted);
+  }
+  .empty-state .icon{ font-size:40px; margin-bottom:12px; opacity:.7; }
+
+  /* Modal */
+  .overlay{
+    position:fixed; inset:0; background:rgba(10,36,38,.55); backdrop-filter:blur(2px); display:flex;
+    align-items:center; justify-content:center; z-index:50; padding:20px;
+  }
+  .modal{
+    background:var(--surface); border-radius:18px; padding:28px; width:100%;
+    max-width:480px; max-height:88vh; overflow-y:auto; box-shadow:var(--shadow-lg);
+  }
+  .modal h2{ font-size:19.5px; margin:0 0 4px; }
+  .modal .sub{ color:var(--muted); font-size:13.5px; margin-bottom:20px; }
+
+  .field{ margin-bottom:14px; }
+  .field label{ display:block; font-size:13px; font-weight:700; margin-bottom:6px; color:var(--primary); }
+  .field input, .field select, .field textarea{
+    width:100%; padding:10px 13px; border-radius:9px; border:1.5px solid var(--border);
+    font-size:14px; background:#fbfdfc; transition:.15s;
+  }
+  .field textarea{ resize:vertical; min-height:60px; }
+
+  .id-scan-box{
+    border:2px dashed var(--border); border-radius:14px; padding:22px; text-align:center;
+    margin-bottom:18px; background:linear-gradient(180deg, #FAFCFB, #F5F8F7);
+  }
+  .id-scan-box img{ max-width:100%; max-height:150px; border-radius:10px; margin-bottom:10px; box-shadow:var(--shadow-sm); }
+  .scan-status{ font-size:13px; color:var(--muted); margin-top:8px; }
+  .scan-status.busy{ color:var(--accent); font-weight:700; }
+  .scan-status.ok{ color:var(--after); font-weight:700; }
+  .scan-status.error{ color:var(--danger); font-weight:700; background:#FBEAE4; padding:8px 10px; border-radius:8px; }
+
+  .modal-actions{ display:flex; gap:10px; margin-top:20px; }
+  .modal-actions button{ flex:1; }
+
+  /* Patient detail */
+  .back-link{
+    display:inline-flex; align-items:center; gap:6px; color:var(--muted);
+    font-size:13.5px; margin-bottom:16px; background:none; border:none; padding:0;
+    font-weight:600; transition:.15s;
+  }
+  .back-link:hover{ color:var(--primary); }
+  .patient-header{
+    display:flex; justify-content:space-between; align-items:flex-start;
+    background:var(--surface); border:1.5px solid var(--border); border-radius:16px;
+    padding:22px; margin-bottom:28px; box-shadow:var(--shadow-sm);
+  }
+  .patient-header .info-grid{
+    display:grid; grid-template-columns:repeat(2,1fr); gap:12px 34px; margin-top:14px;
+  }
+  .info-grid div{ font-size:13.5px; font-weight:600; }
+  .info-grid span{ display:block; color:var(--muted); font-size:11.5px; margin-bottom:2px; font-weight:500; }
+
+  .section-head{ display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; }
+  .section-head h3{ margin:0; font-size:17.5px; }
+
+  .filter-chips{ display:flex; gap:8px; margin-bottom:18px; flex-wrap:wrap; }
+  .chip{
+    padding:7px 15px; border-radius:999px; border:1.5px solid var(--border); font-size:12.5px;
+    font-weight:700; background:var(--surface); color:var(--muted); transition:.15s; cursor:pointer;
+  }
+  .chip.active{ background:var(--primary); color:#fff; border-color:var(--primary); }
+  .chip:hover:not(.active){ border-color:var(--primary-light); color:var(--primary); }
+
+  .timeline{ position:relative; padding-right:24px; }
+  .timeline::before{
+    content:''; position:absolute; right:6px; top:6px; bottom:6px; width:2px; background:var(--border);
+  }
+  .timeline-item{ position:relative; margin-bottom:22px; }
+  .timeline-dot{
+    position:absolute; right:-24px; top:4px; width:11px; height:11px; border-radius:50%;
+    background:var(--primary); border:2px solid var(--surface);
+  }
+  .timeline-dot.after{ background:var(--after); }
+  .timeline-dot.symptom{ background:var(--danger); }
+  .timeline-card{
+    background:var(--surface); border:1.5px solid var(--border); border-radius:14px; padding:14px;
+  }
+  .timeline-date{ font-size:12px; color:var(--muted); font-weight:700; margin-bottom:8px; }
+  .timeline-type{
+    display:inline-block; font-size:10.5px; font-weight:800; padding:4px 11px; border-radius:999px;
+    margin-inline-start:8px; color:#fff; letter-spacing:.01em;
+  }
+  .timeline-type.before{ background:var(--primary); }
+  .timeline-type.after{ background:var(--after); }
+  .timeline-type.symptom{ background:var(--danger); }
+  .timeline-photo{ width:100%; max-width:260px; border-radius:10px; display:block; margin-top:8px; cursor:pointer; }
+  .timeline-note{ font-size:13px; color:var(--text); margin-top:8px; }
+  .timeline-proc{ font-size:12px; color:var(--accent); font-weight:700; margin-top:4px; }
+
+  .photo-grid{ display:grid; grid-template-columns:repeat(auto-fill, minmax(190px,1fr)); gap:16px; }
+  .photo-card{
+    background:var(--surface); border:1.5px solid var(--border); border-radius:16px;
+    overflow:hidden; cursor:pointer; transition:.18s; box-shadow:var(--shadow-sm);
+  }
+  .photo-card:hover{ border-color:var(--primary-light); transform:translateY(-3px); box-shadow:var(--shadow-md); }
+  .photo-card img{ width:100%; aspect-ratio:1/1; object-fit:cover; display:block; background:var(--bg); }
+  .photo-card-body{ padding:11px 13px; }
+  .photo-card-date{ font-size:11px; color:var(--muted); margin-top:7px; font-weight:500; }
+  .photo-card-proc{ font-size:11.5px; color:var(--accent); font-weight:700; margin-top:5px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+
+  .lightbox{
+    position:fixed; inset:0; background:rgba(0,0,0,.85); z-index:60; display:flex;
+    align-items:center; justify-content:center; padding:20px;
+  }
+  .lightbox img{ max-width:100%; max-height:90vh; border-radius:8px; }
+  .lightbox-close{
+    position:absolute; top:20px; left:20px; background:rgba(255,255,255,.15); color:#fff;
+    border:none; width:36px; height:36px; border-radius:50%; font-size:18px;
+  }
+
+  .toast{
+    position:fixed; bottom:24px; left:50%; transform:translateX(-50%);
+    background:var(--primary); color:#fff; padding:12px 22px; border-radius:10px;
+    font-size:13.5px; font-weight:700; z-index:70; box-shadow:0 8px 24px rgba(0,0,0,.2);
+  }
+
+  @media (max-width:720px){
+    .app{ flex-direction:column; }
+    .sidebar{ width:100%; flex-direction:row; align-items:center; padding:14px 18px; }
+    .doctor-card{ display:none; }
+    .nav-item span.label{ display:none; }
+    .main{ padding:20px; }
+    .patient-header{ flex-direction:column; gap:14px; }
+  }
+  .avatar-upload-box{ display:flex; align-items:center; gap:12px; margin-bottom:14px; }
+  .avatar-upload-box img{ width:52px; height:52px; border-radius:50%; object-fit:cover; border:2px solid var(--border); }
+  .avatar-placeholder{ width:52px; height:52px; border-radius:50%; background:var(--bg); border:2px dashed var(--border); display:flex; align-items:center; justify-content:center; font-size:20px; color:var(--muted); flex-shrink:0; }
+  .auth-toggle{ display:flex; gap:8px; margin-bottom:18px; background:var(--bg); border-radius:10px; padding:4px; }
+  .auth-toggle button{ flex:1; padding:9px; border:none; background:none; border-radius:8px; font-weight:700; font-size:13px; color:var(--muted); }
+  .auth-toggle button.active{ background:var(--surface); color:var(--primary); box-shadow:var(--shadow-sm); }
+  .ocr-note{ font-size:11.5px; color:var(--muted); background:var(--bg); padding:9px 11px; border-radius:8px; margin-top:8px; line-height:1.6; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/5.1.0/tesseract.min.js"></script>
+<script type="module">
+// ============ Firebase config — already filled from user's project ============
+const firebaseConfig = {
+  apiKey: "AIzaSyBzXNdozOFW832TRz-R6LLMiPuykdtl2dY",
+  authDomain: "doctor-app-c1af2.firebaseapp.com",
+  projectId: "doctor-app-c1af2",
+  storageBucket: "doctor-app-c1af2.firebasestorage.app",
+  messagingSenderId: "467232877956",
+  appId: "1:467232877956:web:a1d837f8b54c855bc281d1"
+};
+
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js";
+import {
+  getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword,
+  onAuthStateChanged, signOut
+} from "https://www.gstatic.com/firebasejs/10.13.0/firebase-auth.js";
+import {
+  getFirestore, collection, doc, setDoc, getDoc, addDoc, getDocs,
+  query, where, orderBy
+} from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
+import {
+  getStorage, ref, uploadBytes, getDownloadURL
+} from "https://www.gstatic.com/firebasejs/10.13.0/firebase-storage.js";
+
+const fbApp = initializeApp(firebaseConfig);
+const auth = getAuth(fbApp);
+const db = getFirestore(fbApp);
+const fbStorage = getStorage(fbApp);
+
+/* ---------- state ---------- */
+let state = {
+  view: 'login',
+  doctor: null,
+  user: null,
+  patients: [],
+  activePatientId: null,
+  activePatient: null,
+  photos: [],
+  photoFilter: 'all',
+  lightboxUrl: null,
+  toast: null,
+  authMode: 'signin', // signin | signup
+};
+
+function setState(patch){ Object.assign(state, patch); render(); }
+
+/* ---------- helpers ---------- */
+function fmtDate(iso){
+  const d = new Date(iso);
+  return d.toLocaleDateString('ar-EG', { year:'numeric', month:'short', day:'numeric' }) +
+         ' — ' + d.toLocaleTimeString('ar-EG', { hour:'2-digit', minute:'2-digit' });
+}
+
+function showToast(msg){
+  setState({ toast: msg });
+  setTimeout(()=>{ state.toast = null; render(); }, 2600);
+}
+
+function resizeImage(file, maxDim, quality){
+  return new Promise((resolve, reject)=>{
+    const reader = new FileReader();
+    reader.onload = (e)=>{
+      const img = new Image();
+      img.onload = ()=>{
+        let { width, height } = img;
+        if (width > maxDim || height > maxDim){
+          if (width > height){ height = Math.round(height * (maxDim/width)); width = maxDim; }
+          else { width = Math.round(width * (maxDim/height)); height = maxDim; }
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = width; canvas.height = height;
+        canvas.getContext('2d').drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL('image/jpeg', quality));
+      };
+      img.onerror = reject;
+      img.src = e.target.result;
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+function dataURLtoBlob(dataUrl){
+  const [header, b64] = dataUrl.split(',');
+  const mime = header.match(/data:(.*?);base64/)[1];
+  const bin = atob(b64);
+  const arr = new Uint8Array(bin.length);
+  for (let i=0;i<bin.length;i++) arr[i] = bin.charCodeAt(i);
+  return new Blob([arr], { type: mime });
+}
+
+async function uploadImageDataUrl(dataUrl, path){
+  const blob = dataURLtoBlob(dataUrl);
+  const storageRef = ref(fbStorage, path);
+  await uploadBytes(storageRef, blob);
+  return await getDownloadURL(storageRef);
+}
+
+function uid(prefix){ return prefix + '_' + Date.now().toString(36) + Math.random().toString(36).slice(2,8); }
+
+/* ---------- Firestore data layer (scoped per doctor via doctorUid field + security rules) ---------- */
+async function loadDoctorProfile(u){
+  const snap = await getDoc(doc(db, 'doctors', u.uid));
+  return snap.exists() ? snap.data() : null;
+}
+async function saveDoctorProfile(u, profile){
+  await setDoc(doc(db, 'doctors', u.uid), profile, { merge: true });
+}
+
+async function loadPatients(u){
+  const q = query(collection(db, 'patients'), where('doctorUid','==', u.uid));
+  const snap = await getDocs(q);
+  const list = [];
+  snap.forEach(d => list.push({ id: d.id, ...d.data() }));
+  list.sort((a,b)=> new Date(b.createdAt) - new Date(a.createdAt));
+  return list;
+}
+
+async function createPatient(u, patientData){
+  const ref_ = await addDoc(collection(db, 'patients'), { ...patientData, doctorUid: u.uid, createdAt: new Date().toISOString() });
+  return ref_.id;
+}
+
+async function loadPhotos(u, patientId){
+  const q = query(collection(db, 'photos'), where('doctorUid','==', u.uid), where('patientId','==', patientId));
+  const snap = await getDocs(q);
+  const list = [];
+  snap.forEach(d => list.push({ id: d.id, ...d.data() }));
+  list.sort((a,b)=> new Date(b.timestamp) - new Date(a.timestamp));
+  return list;
+}
+
+async function createPhoto(u, patientId, photoData){
+  await addDoc(collection(db, 'photos'), { ...photoData, doctorUid: u.uid, patientId, timestamp: new Date().toISOString() });
+}
+
+/* ---------- OCR (Tesseract.js, runs fully in-browser, no external AI needed) ---------- */
+async function runOcr(dataUrl, onProgress){
+  const { data } = await Tesseract.recognize(dataUrl, 'ara+eng', {
+    logger: m => { if (onProgress && m.status === 'recognizing text') onProgress(Math.round(m.progress*100)); }
+  });
+  return data.text || '';
+}
+
+function extractFieldsFromText(text){
+  const fields = { national_id:'', mrn:'', dob:'', phone:'' };
+  const numbers = (text.match(/\d[\d\s\-\/]{6,}\d/g) || []).map(s => s.replace(/[\s\-]/g,''));
+  const dateMatch = text.match(/\b(\d{4}[\/\-]\d{1,2}[\/\-]\d{1,2}|\d{1,2}[\/\-]\d{1,2}[\/\-]\d{4})\b/);
+  if (dateMatch) fields.dob = dateMatch[0].replace(/\//g,'-');
+  const phoneMatch = numbers.find(n => /^(\+?9665|05|9665)\d{7,8}$/.test(n) || (n.length>=9 && n.length<=13 && /^0|^\+/.test(n)));
+  if (phoneMatch) fields.phone = phoneMatch;
+  const idCandidates = numbers.filter(n => n.length >= 8 && n.length <= 14 && n !== phoneMatch);
+  if (idCandidates.length) fields.national_id = idCandidates[0];
+  if (idCandidates.length > 1) fields.mrn = idCandidates[1];
+  return fields;
+}
+
+/* ---------- render root ---------- */
+function render(){
+  const root = document.getElementById('root');
+  if (state.view === 'login') root.innerHTML = '';
+  renderApp();
+}
+function el(html){
+  const t = document.createElement('template');
+  t.innerHTML = html.trim();
+  return t.content.firstChild;
+}
+
+/* ================= LOGIN / SIGNUP ================= */
+function renderLogin(){
+  const root = document.getElementById('root');
+  const mode = state.authMode;
+  root.innerHTML = `
+    <div style="min-height:100vh; display:flex; align-items:center; justify-content:center; background:radial-gradient(circle at 20% 20%, #E8F0EE 0%, var(--bg) 55%); padding:20px;">
+      <div style="background:var(--surface); border-radius:20px; padding:38px; width:100%; max-width:410px; border:1.5px solid var(--border); box-shadow:var(--shadow-lg);">
+        <div style="display:flex; align-items:center; gap:11px; margin-bottom:22px;">
+          <div class="brand-mark" style="background:var(--accent); width:40px; height:40px; font-size:18px;">س</div>
+          <div style="font-family:'Cairo'; font-weight:800; font-size:22px; color:var(--primary); letter-spacing:-.02em;">سجل</div>
+        </div>
+        <div class="auth-toggle">
+          <button id="tab-signin" class="${mode==='signin'?'active':''}">تسجيل دخول</button>
+          <button id="tab-signup" class="${mode==='signup'?'active':''}">حساب جديد</button>
+        </div>
+        ${mode==='signup' ? `
+        <div class="field"><label>الاسم الكامل</label><input id="doc-name" placeholder="د. مثال الأحمد"></div>
+        <div class="field"><label>التخصص</label><input id="doc-spec" placeholder="جراحة تجميلية، جلدية..."></div>
+        ` : ''}
+        <div class="field"><label>البريد الإلكتروني</label><input id="auth-email" type="email" placeholder="you@example.com"></div>
+        <div class="field"><label>كلمة المرور</label><input id="auth-pass" type="password" placeholder="6 أحرف على الأقل"></div>
+        <div id="login-error" style="display:none; background:#FBEAE4; color:var(--danger); padding:10px 12px; border-radius:9px; font-size:12.5px; margin-bottom:14px; word-break:break-word;"></div>
+        <button class="btn" style="width:100%; justify-content:center;" id="auth-btn">${mode==='signup' ? 'إنشاء الحساب' : 'دخول'}</button>
+      </div>
+    </div>
+    ${state.toast ? `<div class="toast">${state.toast}</div>` : ''}
+  `;
+
+  document.getElementById('tab-signin').onclick = ()=> setState({ authMode:'signin' });
+  document.getElementById('tab-signup').onclick = ()=> setState({ authMode:'signup' });
+
+  document.getElementById('auth-btn').onclick = async ()=>{
+    const email = document.getElementById('auth-email').value.trim();
+    const pass = document.getElementById('auth-pass').value;
+    const errBox = document.getElementById('login-error');
+    errBox.style.display = 'none';
+    if (!email || !pass){ errBox.style.display='block'; errBox.textContent = 'الرجاء تعبئة البريد وكلمة المرور'; return; }
+    const btn = document.getElementById('auth-btn');
+    btn.disabled = true; btn.textContent = '...جاري المعالجة';
+    try{
+      let cred;
+      if (mode === 'signup'){
+        cred = await createUserWithEmailAndPassword(auth, email, pass);
+        const name = (document.getElementById('doc-name')||{}).value?.trim() || '';
+        const spec = (document.getElementById('doc-spec')||{}).value?.trim() || '';
+        await saveDoctorProfile(cred.user, { name, spec, createdAt: new Date().toISOString() });
+      } else {
+        cred = await signInWithEmailAndPassword(auth, email, pass);
+      }
+      const profile = await loadDoctorProfile(cred.user) || { name: email, spec: '' };
+      const patients = await loadPatients(cred.user);
+      setState({ view:'dashboard', user: cred.user, doctor: profile, patients });
+    }catch(err){
+      btn.disabled = false; btn.textContent = mode==='signup' ? 'إنشاء الحساب' : 'دخول';
+      errBox.style.display = 'block';
+      errBox.textContent = 'خطأ: ' + (err && err.message ? err.message : 'غير معروف');
+      console.error('auth error', err);
+    }
+  };
+}
+
+/* ================= SHELL ================= */
+function shell(contentHtml){
+  return `
+    <div class="app">
+      <div class="sidebar">
+        <div class="brand">
+          <div class="brand-mark">س</div>
+          <div class="brand-name">سجل</div>
+        </div>
+        <div>
+          <div class="nav-item active"><span>👥</span><span class="label">المرضى</span></div>
+        </div>
+        <div class="doctor-card">
+          <b>${state.doctor?.name || state.user?.email || ''}</b>
+          ${state.doctor?.spec ? state.doctor.spec : ''}
+          <button class="logout-btn" id="logout-btn">تسجيل خروج</button>
+        </div>
+      </div>
+      <div class="main">${contentHtml}</div>
+    </div>
+    ${state.toast ? `<div class="toast">${state.toast}</div>` : ''}
+    ${state.lightboxUrl ? `<div class="lightbox" id="lightbox"><button class="lightbox-close" id="lb-close">✕</button><img src="${state.lightboxUrl}"></div>` : ''}
+  `;
+}
+function bindShellEvents(){
+  const lo = document.getElementById('logout-btn');
+  if (lo) lo.onclick = async ()=>{ await signOut(auth); setState({ view:'login', doctor:null, user:null, patients:[] }); };
+  const lb = document.getElementById('lb-close');
+  if (lb) lb.onclick = ()=> setState({ lightboxUrl:null });
+  const lbBg = document.getElementById('lightbox');
+  if (lbBg) lbBg.onclick = (e)=>{ if (e.target.id==='lightbox') setState({ lightboxUrl:null }); };
+}
+
+/* ================= DASHBOARD ================= */
+function computeFilteredPatients(){
+  const q = state.searchQuery || '';
+  return state.patients.filter(p => !q || p.name.includes(q) || (p.nationalId||'').includes(q) || (p.mrn||'').includes(q));
+}
+function patientGridHtml(filtered){
+  const q = state.searchQuery || '';
+  return filtered.length ? filtered.map(p => `
+    <div class="patient-card" data-id="${p.id}">
+      <div class="patient-avatar">${p.avatarUrl ? `<img src="${p.avatarUrl}" style="width:100%;height:100%;border-radius:50%;object-fit:cover;">` : ((p.name||'؟').trim()[0] || '؟')}</div>
+      <div class="patient-name">${p.name}</div>
+      <div class="patient-meta">${p.nationalId ? 'هوية: '+p.nationalId : (p.mrn ? 'ملف: '+p.mrn : '')}</div>
+      <div class="patient-meta">${p.dob ? 'الميلاد: '+p.dob : ''}</div>
+    </div>
+  `).join('') : `
+    <div class="empty-state" style="grid-column:1/-1;">
+      <div class="icon">🗂️</div>
+      <div>${q ? 'لا توجد نتائج مطابقة' : 'لا يوجد مرضى بعد — ابدأ بإضافة أول مريض'}</div>
+    </div>
+  `;
+}
+function bindPatientCards(){
+  document.querySelectorAll('.patient-card').forEach(c=>{
+    c.onclick = async ()=>{
+      const patient = state.patients.find(p=>p.id===c.dataset.id);
+      const photos = await loadPhotos(state.user, patient.id);
+      setState({ view:'patient', activePatientId: patient.id, activePatient: patient, photos, photoFilter:'all' });
+    };
+  });
+}
+function updatePatientGrid(){
+  const grid = document.querySelector('.patient-grid');
+  if (!grid) return;
+  grid.innerHTML = patientGridHtml(computeFilteredPatients());
+  bindPatientCards();
+}
+function renderDashboard(){
+  const root = document.getElementById('root');
+  const q = state.searchQuery || '';
+  root.innerHTML = shell(`
+    <div class="topbar">
+      <div>
+        <h1 class="page-title">المرضى</h1>
+        <div class="page-sub">${state.patients.length} مريض مسجّل</div>
+      </div>
+      <button class="btn" id="add-patient-btn">+ إضافة مريض</button>
+    </div>
+    <div class="search-bar">
+      <input id="search-input" placeholder="ابحث بالاسم أو رقم الهوية أو رقم الملف..." value="${q}">
+    </div>
+    <div class="patient-grid">${patientGridHtml(computeFilteredPatients())}</div>
+  `);
+  bindShellEvents();
+  document.getElementById('add-patient-btn').onclick = ()=> setState({ showAddModal:true });
+  document.getElementById('search-input').oninput = (e)=>{ state.searchQuery = e.target.value; updatePatientGrid(); };
+  bindPatientCards();
+  if (state.showAddModal) renderAddPatientModal();
+}
+
+/* ================= ADD PATIENT MODAL ================= */
+let scanState = { previewUrl:null, ocrRunning:false, ocrDone:false, errorMsg:null, avatarDataUrl:null };
+
+function renderAddPatientModal(){
+  const overlay = el(`
+    <div class="overlay" id="add-overlay">
+      <div class="modal">
+        <h2>إضافة مريض جديد</h2>
+        <div class="sub">صوّر بطاقة الهوية لتعبئة الأرقام تلقائياً (الاسم يُدخل يدوياً)</div>
+
+        <div class="id-scan-box" id="scan-box">
+          ${scanState.previewUrl ? `<img src="${scanState.previewUrl}">` : `<div style="font-size:30px;">🪪</div><div style="font-size:13px; color:var(--muted); margin-top:6px;">اضغط لتصوير أو رفع صورة البطاقة</div>`}
+          <input type="file" id="id-file" accept="image/*" capture="environment" style="display:none;">
+          <button class="btn secondary" id="scan-trigger" style="margin-top:10px;">📷 اختيار صورة البطاقة</button>
+          <div class="scan-status ${scanState.ocrRunning ? 'busy' : (scanState.ocrDone ? 'ok' : (scanState.errorMsg ? 'error' : ''))}" id="scan-status">
+            ${scanState.ocrRunning ? ('جاري القراءة... ' + (scanState.progress||0) + '%') : (scanState.ocrDone ? '✓ تم استخراج الأرقام المتوفرة — راجعها وأدخل الاسم' : (scanState.errorMsg || ''))}
+          </div>
+        </div>
+
+        <div class="avatar-upload-box">
+          ${scanState.avatarDataUrl ? `<img src="${scanState.avatarDataUrl}">` : `<div class="avatar-placeholder">👤</div>`}
+          <div>
+            <button class="btn secondary" id="avatar-trigger" style="padding:7px 14px; font-size:12.5px;">صورة شخصية (اختياري)</button>
+            <input type="file" id="avatar-file" accept="image/*" style="display:none;">
+          </div>
+        </div>
+
+        <div class="field"><label>الاسم الكامل *</label><input id="f-name" value=""></div>
+        <div class="field"><label>رقم الهوية</label><input id="f-nid" value=""></div>
+        <div class="field"><label>رقم الملف الطبي (MRN)</label><input id="f-mrn" value="" placeholder="رقم الملف بالمستشفى إن وجد"></div>
+        <div class="field"><label>تاريخ الميلاد</label><input id="f-dob" placeholder="YYYY-MM-DD" value=""></div>
+        <div class="field"><label>الجنس</label>
+          <select id="f-gender">
+            <option value="">غير محدد</option>
+            <option value="ذكر">ذكر</option>
+            <option value="أنثى">أنثى</option>
+          </select>
+        </div>
+        <div class="field"><label>رقم الجوال</label><input id="f-phone" value=""></div>
+
+        <div class="modal-actions">
+          <button class="btn secondary" id="cancel-add">إلغاء</button>
+          <button class="btn" id="save-patient">حفظ المريض</button>
+        </div>
+      </div>
+    </div>
+  `);
+  document.getElementById('root').appendChild(overlay);
+
+  document.getElementById('scan-trigger').onclick = ()=> document.getElementById('id-file').click();
+  document.getElementById('id-file').onchange = async (e)=>{
+    const file = e.target.files[0];
+    if (!file) return;
+    const dataUrl = await resizeImage(file, 1200, 0.8);
+    scanState = { ...scanState, previewUrl: dataUrl, ocrRunning: true, ocrDone: false, errorMsg: null, progress:0 };
+    document.getElementById('add-overlay').remove();
+    renderAddPatientModal();
+    try{
+      const text = await runOcr(dataUrl, (pct)=>{
+        scanState.progress = pct;
+        const statusEl = document.getElementById('scan-status');
+        if (statusEl) statusEl.textContent = 'جاري القراءة... ' + pct + '%';
+      });
+      const fields = extractFieldsFromText(text);
+      document.getElementById('f-nid').value = fields.national_id || '';
+      document.getElementById('f-mrn').value = fields.mrn || '';
+      document.getElementById('f-dob').value = fields.dob || '';
+      document.getElementById('f-phone').value = fields.phone || '';
+      scanState.ocrRunning = false; scanState.ocrDone = true;
+      document.getElementById('scan-status').className = 'scan-status ok';
+      document.getElementById('scan-status').textContent = '✓ تم استخراج الأرقام المتوفرة — راجعها وأدخل الاسم';
+    }catch(err){
+      scanState.ocrRunning = false; scanState.ocrDone = false;
+      scanState.errorMsg = 'تعذّرت القراءة التلقائية: ' + (err && err.message ? err.message : 'خطأ غير معروف') + ' — أدخل البيانات يدوياً';
+      document.getElementById('scan-status').className = 'scan-status error';
+      document.getElementById('scan-status').textContent = scanState.errorMsg;
+      console.error('OCR error', err);
+    }
+  };
+
+  document.getElementById('avatar-trigger').onclick = ()=> document.getElementById('avatar-file').click();
+  document.getElementById('avatar-file').onchange = async (e)=>{
+    const file = e.target.files[0];
+    if (!file) return;
+    const dataUrl = await resizeImage(file, 400, 0.85);
+    scanState.avatarDataUrl = dataUrl;
+    document.getElementById('add-overlay').remove();
+    renderAddPatientModal();
+  };
+
+  document.getElementById('cancel-add').onclick = ()=>{
+    scanState = { previewUrl:null, ocrRunning:false, ocrDone:false, errorMsg:null, avatarDataUrl:null };
+    setState({ showAddModal:false });
+  };
+
+  document.getElementById('save-patient').onclick = async ()=>{
+    const name = document.getElementById('f-name').value.trim();
+    if (!name){ showToast('اسم المريض مطلوب'); return; }
+    const saveBtn = document.getElementById('save-patient');
+    saveBtn.disabled = true; saveBtn.textContent = 'جاري الحفظ...';
+    try{
+      const patientData = {
+        name,
+        nationalId: document.getElementById('f-nid').value.trim(),
+        mrn: document.getElementById('f-mrn').value.trim(),
+        dob: document.getElementById('f-dob').value.trim(),
+        gender: document.getElementById('f-gender').value,
+        phone: document.getElementById('f-phone').value.trim(),
+        avatarUrl: null,
+      };
+      const patientId = await createPatient(state.user, patientData);
+      if (scanState.avatarDataUrl){
+        const url = await uploadImageDataUrl(scanState.avatarDataUrl, `doctors/${state.user.uid}/patients/${patientId}/avatar.jpg`);
+        await setDoc(doc(db,'patients',patientId), { avatarUrl: url }, { merge:true });
+      }
+      const patients = await loadPatients(state.user);
+      scanState = { previewUrl:null, ocrRunning:false, ocrDone:false, errorMsg:null, avatarDataUrl:null };
+      setState({ showAddModal:false, patients });
+      showToast('تم حفظ المريض بنجاح');
+    }catch(err){
+      saveBtn.disabled = false; saveBtn.textContent = 'حفظ المريض';
+      showToast('تعذّر الحفظ: ' + (err && err.message ? err.message : 'خطأ غير معروف'));
+      console.error('save patient error', err);
+    }
+  };
+}
+
+/* ================= PATIENT DETAIL ================= */
+function typeLabel(t){
+  return t === 'before' ? 'قبل العملية' : t === 'after' ? 'بعد العملية' : 'عرض/أعراض';
+}
+
+function renderPatientDetail(){
+  const root = document.getElementById('root');
+  const p = state.activePatient;
+  const filter = state.photoFilter;
+  const photos = filter === 'all' ? state.photos : state.photos.filter(ph => ph.type === filter);
+
+  const gridHtml = photos.length ? photos.map(ph => `
+    <div class="photo-card" data-url="${ph.imageUrl}">
+      <img src="${ph.imageUrl}">
+      <div class="photo-card-body">
+        <span class="timeline-type ${ph.type}" style="margin-inline-start:0;">${typeLabel(ph.type)}</span>
+        <div class="photo-card-date">${fmtDate(ph.timestamp)}</div>
+        ${ph.procedure ? `<div class="photo-card-proc">🏷️ ${ph.procedure}</div>` : ''}
+      </div>
+    </div>
+  `).join('') : `<div class="empty-state" style="grid-column:1/-1;"><div class="icon">📷</div><div>لا توجد صور بهذا التصنيف بعد</div></div>`;
+
+  root.innerHTML = shell(`
+    <button class="back-link" id="back-btn">→ رجوع لقائمة المرضى</button>
+    <div class="patient-header">
+      <div style="display:flex; gap:16px; align-items:flex-start;">
+        ${p.avatarUrl ? `<img src="${p.avatarUrl}" style="width:60px; height:60px; border-radius:50%; object-fit:cover; border:2px solid var(--border); flex-shrink:0;">` : `<div class="patient-avatar" style="width:60px; height:60px; font-size:22px; margin-bottom:0;">${(p.name||'؟').trim()[0] || '؟'}</div>`}
+        <div>
+          <h1 class="page-title">${p.name}</h1>
+          <div class="info-grid">
+            <div><span>رقم الهوية</span>${p.nationalId || '—'}</div>
+            <div><span>رقم الملف الطبي</span>${p.mrn || '—'}</div>
+            <div><span>تاريخ الميلاد</span>${p.dob || '—'}</div>
+            <div><span>الجنس</span>${p.gender || '—'}</div>
+            <div><span>الجوال</span>${p.phone || '—'}</div>
+          </div>
+        </div>
+      </div>
+      <button class="btn accent" id="add-photo-btn">📷 إضافة صورة</button>
+    </div>
+
+    <div class="section-head"><h3>الصور الموثّقة</h3></div>
+    <div class="filter-chips">
+      <div class="chip ${filter==='all'?'active':''}" data-f="all">الكل</div>
+      <div class="chip ${filter==='before'?'active':''}" data-f="before">قبل العملية</div>
+      <div class="chip ${filter==='after'?'active':''}" data-f="after">بعد العملية</div>
+      <div class="chip ${filter==='symptom'?'active':''}" data-f="symptom">أعراض</div>
+    </div>
+    <div class="photo-grid">${gridHtml}</div>
+  `);
+
+  bindShellEvents();
+  document.getElementById('back-btn').onclick = ()=> setState({ view:'dashboard' });
+  document.getElementById('add-photo-btn').onclick = ()=> setState({ showAddPhotoModal:true });
+  document.querySelectorAll('.chip').forEach(c=>{ c.onclick = ()=> setState({ photoFilter: c.dataset.f }); });
+  document.querySelectorAll('.photo-card').forEach(card=>{ card.onclick = ()=> setState({ lightboxUrl: card.dataset.url }); });
+
+  if (state.showAddPhotoModal) renderAddPhotoModal();
+}
+
+/* ================= ADD PHOTO MODAL ================= */
+let photoDraft = { dataUrl:null };
+
+function renderAddPhotoModal(){
+  const overlay = el(`
+    <div class="overlay" id="photo-overlay">
+      <div class="modal">
+        <h2>إضافة صورة جديدة</h2>
+        <div class="sub">سيُسجَّل تاريخ ووقت الإضافة تلقائياً</div>
+        <div class="id-scan-box" id="photo-box">
+          ${photoDraft.dataUrl ? `<img src="${photoDraft.dataUrl}">` : `<div style="font-size:30px;">📷</div><div style="font-size:13px; color:var(--muted); margin-top:6px;">التقط أو ارفع صورة</div>`}
+          <input type="file" id="photo-file" accept="image/*" capture="environment" style="display:none;">
+          <button class="btn secondary" id="photo-trigger" style="margin-top:10px;">اختيار صورة</button>
+        </div>
+        <div class="field"><label>نوع الصورة *</label>
+          <select id="p-type">
+            <option value="before">قبل العملية</option>
+            <option value="after">بعد العملية</option>
+            <option value="symptom">عرض / أعراض</option>
+          </select>
+        </div>
+        <div class="field"><label>اسم الإجراء/العملية (اختياري)</label><input id="p-procedure" placeholder="مثال: شفط دهون - البطن"></div>
+        <div class="field"><label>ملاحظة (اختياري)</label><textarea id="p-note" placeholder="أي تفاصيل إضافية..."></textarea></div>
+        <div class="modal-actions">
+          <button class="btn secondary" id="cancel-photo">إلغاء</button>
+          <button class="btn accent" id="save-photo">حفظ الصورة</button>
+        </div>
+      </div>
+    </div>
+  `);
+  document.getElementById('root').appendChild(overlay);
+
+  document.getElementById('photo-trigger').onclick = ()=> document.getElementById('photo-file').click();
+  document.getElementById('photo-file').onchange = async (e)=>{
+    const file = e.target.files[0];
+    if (!file) return;
+    photoDraft.dataUrl = await resizeImage(file, 1200, 0.78);
+    document.getElementById('photo-overlay').remove();
+    renderAddPhotoModal();
+  };
+
+  document.getElementById('cancel-photo').onclick = ()=>{
+    photoDraft = { dataUrl:null };
+    setState({ showAddPhotoModal:false });
+  };
+
+  document.getElementById('save-photo').onclick = async ()=>{
+    if (!photoDraft.dataUrl){ showToast('الرجاء اختيار صورة'); return; }
+    const saveBtn = document.getElementById('save-photo');
+    saveBtn.disabled = true; saveBtn.textContent = 'جاري الحفظ...';
+    try{
+      const photoId = uid('ph');
+      const imageUrl = await uploadImageDataUrl(photoDraft.dataUrl, `doctors/${state.user.uid}/patients/${state.activePatientId}/photos/${photoId}.jpg`);
+      await createPhoto(state.user, state.activePatientId, {
+        type: document.getElementById('p-type').value,
+        procedure: document.getElementById('p-procedure').value.trim(),
+        note: document.getElementById('p-note').value.trim(),
+        imageUrl,
+      });
+      const photos = await loadPhotos(state.user, state.activePatientId);
+      photoDraft = { dataUrl:null };
+      setState({ showAddPhotoModal:false, photos });
+      showToast('تم حفظ الصورة بنجاح');
+    }catch(err){
+      saveBtn.disabled = false; saveBtn.textContent = 'حفظ الصورة';
+      showToast('تعذّر الحفظ: ' + (err && err.message ? err.message : 'خطأ غير معروف'));
+      console.error('save photo error', err);
+    }
+  };
+}
+
+/* ================= APP ROUTER ================= */
+function renderApp(){
+  if (state.view === 'login') renderLogin();
+  else if (state.view === 'dashboard') renderDashboard();
+  else if (state.view === 'patient') renderPatientDetail();
+}
+
+/* ================= INIT ================= */
+onAuthStateChanged(auth, async (u)=>{
+  if (u && state.view === 'login'){
+    try{
+      const profile = await loadDoctorProfile(u) || { name: u.email, spec:'' };
+      const patients = await loadPatients(u);
+      state = { ...state, view:'dashboard', user:u, doctor:profile, patients };
+    }catch(e){ console.error(e); }
+  }
+  render();
+});
+</script>
+</body>
+</html>
