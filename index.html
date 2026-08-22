@@ -401,14 +401,74 @@ async function runOcr(dataUrl, onProgress){
 
 function extractFieldsFromText(text){
   const fields = { national_id:'', mrn:'', dob:'', phone:'' };
-  const numbers = (text.match(/\d[\d\s\-\/]{6,}\d/g) || []).map(s => s.replace(/[\s\-]/g,''));
-  const dateMatch = text.match(/\b(\d{4}[\/\-]\d{1,2}[\/\-]\d{1,2}|\d{1,2}[\/\-]\d{1,2}[\/\-]\d{4})\b/);
-  if (dateMatch) fields.dob = dateMatch[0].replace(/\//g,'-');
-  const phoneMatch = numbers.find(n => /^(\+?9665|05|9665)\d{7,8}$/.test(n) || (n.length>=9 && n.length<=13 && /^0|^\+/.test(n)));
-  if (phoneMatch) fields.phone = phoneMatch;
-  const idCandidates = numbers.filter(n => n.length >= 8 && n.length <= 14 && n !== phoneMatch);
-  if (idCandidates.length) fields.national_id = idCandidates[0];
-  if (idCandidates.length > 1) fields.mrn = idCandidates[1];
+  const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+
+  const DATE_RE = /\d{4}[\/\-]\d{1,2}[\/\-]\d{1,2}|\d{1,2}[\/\-]\d{1,2}[\/\-]\d{4}/;
+  const NUM_RE = /\d[\d\s\-]{6,}\d/;
+
+  // كل تاريخ ملقى بالنص، مع رقم السطر اللي فيه، عشان نميّز لاحقاً
+  const allDates = [];
+  lines.forEach((line, i) => {
+    const m = line.match(DATE_RE);
+    if (m) allDates.push({ raw: m[0].replace(/\//g,'-'), line: i, text: line });
+  });
+
+  // كلمات مفتاحية عربي/إنجليزي لكل حقل — تدور بنفس السطر أو السطر اللي بعده
+  const KEYWORDS = {
+    dob:     [/الميلاد/, /تاريخ\s*الميلاد/, /D\.?O\.?B/i, /Birth/i],
+    expiry:  [/الانتهاء/, /الصلاحية/, /انتهاء/, /Expiry/i, /Exp\b/i],
+    mrn:     [/رقم\s*الملف/, /الملف\s*الطبي/, /MRN/i, /Medical\s*Record/i, /السجل\s*الطبي/],
+    national:[/رقم\s*الهوية/, /الهوية/, /الرقم\s*الوطني/, /National/i, /I\.?D\.?\s*No/i],
+    phone:   [/جوال/, /هاتف/, /Phone/i, /Mobile/i],
+  };
+
+  function findNear(regexList, extractRe){
+    for (let i=0; i<lines.length; i++){
+      if (regexList.some(r => r.test(lines[i]))){
+        const sameLine = lines[i].match(extractRe);
+        if (sameLine) return sameLine[0];
+        if (lines[i+1]){
+          const nextLine = lines[i+1].match(extractRe);
+          if (nextLine) return nextLine[0];
+        }
+      }
+    }
+    return null;
+  }
+
+  // 1) نحاول أول شي بالكلمات المفتاحية (أدق طريقة)
+  let dobByKeyword = findNear(KEYWORDS.dob, DATE_RE);
+  let expiryLine = -1;
+  lines.forEach((line, i) => { if (KEYWORDS.expiry.some(r => r.test(line))) expiryLine = i; });
+
+  if (dobByKeyword){
+    fields.dob = dobByKeyword.replace(/\//g,'-');
+  } else if (allDates.length){
+    // 2) ما لقينا كلمة "الميلاد" — نستبعد أي تاريخ بنفس سطر "الانتهاء"، وناخذ أقدم تاريخ (الميلاد دايماً أقدم من الإصدار/الانتهاء)
+    const candidates = allDates.filter(d => d.line !== expiryLine);
+    const pool = candidates.length ? candidates : allDates;
+    pool.sort((a,b)=> new Date(a.raw) - new Date(b.raw));
+    fields.dob = pool[0].raw;
+  }
+
+  const mrnByKeyword = findNear(KEYWORDS.mrn, NUM_RE);
+  const idByKeyword = findNear(KEYWORDS.national, NUM_RE);
+  const phoneByKeyword = findNear(KEYWORDS.phone, NUM_RE);
+
+  const numbers = (text.match(/\d[\d\s\-]{6,}\d/g) || []).map(s => s.replace(/[\s\-]/g,''));
+  const phoneGuess = numbers.find(n => /^(\+?9665|05|9665)\d{7,8}$/.test(n));
+
+  fields.national_id = (idByKeyword || '').replace(/[\s\-]/g,'') || '';
+  fields.mrn = (mrnByKeyword || '').replace(/[\s\-]/g,'') || '';
+  fields.phone = (phoneByKeyword || phoneGuess || '').replace(/[\s\-]/g,'') || '';
+
+  // 3) لو ما لقينا بالكلمات المفتاحية، رجوع لطريقة "أول رقمين" كحل أخير
+  if (!fields.national_id && !fields.mrn){
+    const idCandidates = numbers.filter(n => n.length >= 8 && n.length <= 14 && n !== fields.phone);
+    if (idCandidates.length) fields.national_id = idCandidates[0];
+    if (idCandidates.length > 1) fields.mrn = idCandidates[1];
+  }
+
   return fields;
 }
 
