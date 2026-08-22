@@ -255,6 +255,7 @@
 <body>
 <div id="root"></div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/5.1.0/tesseract.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
 <script type="module">
 // ============ Firebase config — already filled from user's project ============
 const firebaseConfig = {
@@ -392,6 +393,44 @@ async function createPhoto(u, patientId, photoData){
 }
 
 /* ---------- OCR (Tesseract.js, runs fully in-browser, no external AI needed) ---------- */
+/* ---------- face detection (face-api.js, runs fully in-browser) — used to auto-crop the personal photo from the ID card ---------- */
+let faceApiReady = false;
+(async function loadFaceModels(){
+  try{
+    const MODEL_URL = 'https://cdn.jsdelivr.net/gh/justadudewhohacks/face-api.js@master/weights';
+    await faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL);
+    faceApiReady = true;
+  }catch(e){ console.error('face model load failed', e); }
+})();
+
+async function detectAndCropFace(dataUrl, targetSize){
+  if (!faceApiReady) throw new Error('كاشف الوجه لسا يجهّز، حاول بعد ثوانٍ');
+  const img = await new Promise((resolve, reject)=>{
+    const im = new Image();
+    im.onload = ()=> resolve(im);
+    im.onerror = ()=> reject(new Error('تعذّر تحميل الصورة'));
+    im.src = dataUrl;
+  });
+  const detection = await faceapi.detectSingleFace(img, new faceapi.TinyFaceDetectorOptions());
+  if (!detection) throw new Error('لم يتم العثور على وجه واضح بالصورة');
+  const box = detection.box;
+  const padX = box.width * 0.7;
+  const padY = box.height * 1.0;
+  const sx = Math.max(0, box.x - padX/2);
+  const sy = Math.max(0, box.y - padY*0.65);
+  const sw = Math.min(img.width - sx, box.width + padX);
+  const sh = Math.min(img.height - sy, box.height + padY);
+  const size = targetSize || 240;
+  const canvas = document.createElement('canvas');
+  canvas.width = size; canvas.height = size;
+  const ctx = canvas.getContext('2d');
+  const srcSize = Math.min(sw, sh);
+  const cropX = sx + (sw - srcSize)/2;
+  const cropY = sy + (sh - srcSize)/2;
+  ctx.drawImage(img, cropX, cropY, srcSize, srcSize, 0, 0, size, size);
+  return canvas.toDataURL('image/jpeg', 0.85);
+}
+
 async function runOcr(dataUrl, onProgress){
   const { data } = await Tesseract.recognize(dataUrl, 'ara+eng', {
     logger: m => { if (onProgress && m.status === 'recognizing text') onProgress(Math.round(m.progress*100)); }
@@ -399,9 +438,32 @@ async function runOcr(dataUrl, onProgress){
   return data.text || '';
 }
 
+function guessName(lines){
+  const NAME_KEYWORDS = [/الاسم/, /^Name/i];
+  for (let i=0; i<lines.length; i++){
+    if (NAME_KEYWORDS.some(r => r.test(lines[i]))){
+      const sameLine = lines[i].replace(/(الاسم|Name)\s*[:\-]?\s*/i, '').trim();
+      if (sameLine && /[\u0600-\u06FF]{2,}/.test(sameLine) && !/^\d+$/.test(sameLine)) return sameLine;
+      if (lines[i+1] && /^[\u0600-\u06FF\s]{4,}$/.test(lines[i+1])) return lines[i+1].trim();
+    }
+  }
+  // ما لقينا كلمة "الاسم" — نجرب أطول سطر عربي بدون أرقام يشبه اسم شخص (كلمتين فأكثر)
+  let best = '';
+  lines.forEach(line=>{
+    const cleaned = line.trim();
+    const isArabicOnly = /^[\u0600-\u06FF\s]+$/.test(cleaned);
+    const wordCount = cleaned.split(/\s+/).filter(Boolean).length;
+    if (isArabicOnly && wordCount >= 2 && wordCount <= 5 && cleaned.length > best.length && cleaned.length < 45){
+      best = cleaned;
+    }
+  });
+  return best;
+}
+
 function extractFieldsFromText(text){
-  const fields = { national_id:'', mrn:'', dob:'', phone:'' };
+  const fields = { national_id:'', mrn:'', dob:'', phone:'', full_name:'' };
   const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+  fields.full_name = guessName(lines);
 
   const DATE_RE = /\d{4}[\/\-]\d{1,2}[\/\-]\d{1,2}|\d{1,2}[\/\-]\d{1,2}[\/\-]\d{4}/;
   const NUM_RE = /\d[\d\s\-]{6,}\d/;
@@ -701,13 +763,29 @@ function renderAddPatientModal(){
         if (statusEl) statusEl.textContent = 'جاري القراءة... ' + pct + '%';
       });
       const fields = extractFieldsFromText(text);
+      document.getElementById('f-name').value = fields.full_name || '';
       document.getElementById('f-nid').value = fields.national_id || '';
       document.getElementById('f-mrn').value = fields.mrn || '';
       document.getElementById('f-dob').value = fields.dob || '';
       document.getElementById('f-phone').value = fields.phone || '';
       scanState.ocrRunning = false; scanState.ocrDone = true;
       document.getElementById('scan-status').className = 'scan-status ok';
-      document.getElementById('scan-status').textContent = '✓ تم استخراج الأرقام المتوفرة — راجعها وأدخل الاسم';
+      document.getElementById('scan-status').textContent = '✓ تم استخراج البيانات — راجعها قبل الحفظ';
+
+      // نحاول كشف وجه بالصورة وقصّه كصورة شخصية للمريض (مستقل عن نجاح OCR)
+      try{
+        const avatarUrl = await detectAndCropFace(dataUrl, 240);
+        scanState.avatarDataUrl = avatarUrl;
+        document.getElementById('add-overlay').remove();
+        renderAddPatientModal();
+        document.getElementById('f-name').value = fields.full_name || '';
+        document.getElementById('f-nid').value = fields.national_id || '';
+        document.getElementById('f-mrn').value = fields.mrn || '';
+        document.getElementById('f-dob').value = fields.dob || '';
+        document.getElementById('f-phone').value = fields.phone || '';
+      }catch(faceErr){
+        console.log('face detection:', faceErr.message);
+      }
     }catch(err){
       scanState.ocrRunning = false; scanState.ocrDone = false;
       scanState.errorMsg = 'تعذّرت القراءة التلقائية: ' + (err && err.message ? err.message : 'خطأ غير معروف') + ' — أدخل البيانات يدوياً';
