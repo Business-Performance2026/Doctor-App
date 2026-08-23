@@ -70,6 +70,16 @@
     transition:.15s;
   }
   .logout-btn:hover{ background:rgba(255,255,255,.08); color:#fff; }
+  .logout-btn-top{
+    background:#FBEAE4; border:1px solid rgba(179,70,44,.22); color:var(--danger);
+    padding:6px 14px; border-radius:8px; font-size:12px; font-weight:700; flex-shrink:0; transition:.15s;
+  }
+  .logout-btn-top:hover{ background:#F6D8CE; }
+  .doctor-card .logout-btn-top{
+    background:rgba(255,255,255,.1); border:1px solid rgba(255,255,255,.25); color:#fff;
+    width:100%; margin-bottom:12px; padding:7px 10px;
+  }
+  .doctor-card .logout-btn-top:hover{ background:rgba(255,255,255,.18); }
 
   .main{ flex:1; padding:36px 44px; max-width:1140px; }
   .topbar{ display:flex; justify-content:space-between; align-items:center; margin-bottom:28px; }
@@ -216,12 +226,21 @@
   }
   .photo-card:hover{ border-color:var(--primary-light); transform:translateY(-3px); box-shadow:var(--shadow-md); }
   .photo-card img{ width:100%; height:100%; object-fit:cover; display:block; }
-  .photo-card-body{
-    position:absolute; inset:auto 0 0 0; padding:8px 9px 7px;
-    background:linear-gradient(to top, rgba(10,36,38,.88), rgba(10,36,38,.35) 65%, rgba(10,36,38,0));
+  .photo-card-dot{
+    position:absolute; top:7px; left:7px; width:11px; height:11px; border-radius:50%;
+    border:2px solid rgba(255,255,255,.9); box-shadow:0 1px 3px rgba(0,0,0,.35);
   }
-  .photo-card-date{ font-size:10px; color:#E8F0EE; margin-top:5px; font-weight:500; }
-  .photo-card-proc{ font-size:10.5px; color:#FFD9B0; font-weight:700; margin-top:2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .photo-card-dot.before{ background:var(--primary); }
+  .photo-card-dot.after{ background:var(--after); }
+  .photo-card-dot.symptom{ background:var(--danger); }
+  .lightbox-caption{
+    position:absolute; bottom:0; left:0; right:0; padding:16px 18px calc(16px + env(safe-area-inset-bottom));
+    background:linear-gradient(to top, rgba(0,0,0,.75), rgba(0,0,0,0));
+    color:#fff; text-align:center;
+  }
+  .lightbox-caption .timeline-type{ margin-inline-start:0; }
+  .lightbox-caption .lb-date{ font-size:12.5px; color:#E8F0EE; margin-top:8px; }
+  .lightbox-caption .lb-proc{ font-size:12.5px; color:#FFD9B0; font-weight:700; margin-top:4px; }
 
   .lightbox{
     position:fixed; inset:0; background:rgba(0,0,0,.85); z-index:60; display:flex;
@@ -549,6 +568,21 @@ function renderLogin(){
 }
 
 /* ================= SETTINGS MODAL (API KEY) ================= */
+function renderProfileModalHtml(){
+  return `
+    <div class="overlay" id="profile-overlay">
+      <div class="modal">
+        <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:6px;">
+          <h2>الملف الشخصي</h2>
+          <button class="logout-btn-top" id="profile-logout-btn">تسجيل خروج</button>
+        </div>
+        <div class="sub">${state.doctor?.name || state.user?.email || ''}${state.doctor?.spec ? ' — ' + state.doctor.spec : ''}</div>
+        <button class="btn secondary" id="profile-settings-btn" style="width:100%; justify-content:center; margin-top:18px;">⚙️ إعدادات الاستخراج الذكي</button>
+        <button class="btn ghost" id="profile-close-btn" style="width:100%; justify-content:center; margin-top:10px;">إغلاق</button>
+      </div>
+    </div>
+  `;
+}
 function renderSettingsModal(){
   const overlay = el(`
     <div class="overlay" id="settings-overlay">
@@ -591,10 +625,10 @@ function shell(contentHtml){
           <div class="nav-item active"><span>👥</span><span class="label">المرضى</span></div>
         </div>
         <div class="doctor-card">
+          <button class="logout-btn-top" id="logout-btn">تسجيل خروج</button>
           <b>${state.doctor?.name || state.user?.email || ''}</b>
           ${state.doctor?.spec ? state.doctor.spec : ''}
           <button class="settings-btn" id="settings-btn">⚙️ إعدادات الاستخراج الذكي</button>
-          <button class="logout-btn" id="logout-btn">تسجيل خروج</button>
         </div>
       </div>
       <div class="main">${contentHtml}</div>
@@ -602,11 +636,25 @@ function shell(contentHtml){
     <div class="bottom-nav">
       <button class="bn-item ${state.view==='dashboard'?'active':''}" id="bn-home"><span class="bn-icon">🏠</span><span>الرئيسية</span></button>
       <button class="bn-item" id="bn-add"><span class="bn-icon">➕</span><span>إضافة مريض</span></button>
-      <button class="bn-item" id="bn-settings"><span class="bn-icon">⚙️</span><span>إعدادات</span></button>
-      <button class="bn-item" id="bn-logout"><span class="bn-icon">🚪</span><span>خروج</span></button>
+      <button class="bn-item" id="bn-patients"><span class="bn-icon">👥</span><span>المرضى</span></button>
+      <button class="bn-item" id="bn-profile"><span class="bn-icon">👤</span><span>الملف الشخصي</span></button>
     </div>
     ${state.toast ? `<div class="toast">${state.toast}</div>` : ''}
-    ${state.lightboxUrl ? `<div class="lightbox" id="lightbox"><button class="lightbox-close" id="lb-close">✕</button><img src="${state.lightboxUrl}"></div>` : ''}
+    ${state.lightboxUrl ? (()=>{
+      const ph = state.photos.find(p => p.id === state.lightboxUrl);
+      if (!ph) return '';
+      return `<div class="lightbox" id="lightbox">
+        <button class="lightbox-close" id="lb-close">✕</button>
+        <img src="${ph.imageUrl}">
+        <div class="lightbox-caption">
+          <span class="timeline-type ${ph.type}">${typeLabel(ph.type)}</span>
+          <div class="lb-date">${fmtDate(ph.timestamp)}</div>
+          ${ph.procedure ? `<div class="lb-proc">🏷️ ${ph.procedure}</div>` : ''}
+          ${ph.note ? `<div class="lb-proc" style="color:#E8F0EE; font-weight:500;">${ph.note}</div>` : ''}
+        </div>
+      </div>`;
+    })() : ''}
+    ${state.showProfile ? renderProfileModalHtml() : ''}
   `;
 }
 function bindShellEvents(){
@@ -628,10 +676,17 @@ function bindShellEvents(){
     if (state.view !== 'dashboard') setState({ view:'dashboard', showAddModal:true });
     else setState({ showAddModal:true });
   };
-  const bnSettings = document.getElementById('bn-settings');
-  if (bnSettings) bnSettings.onclick = ()=> setState({ showSettings:true });
-  const bnLogout = document.getElementById('bn-logout');
-  if (bnLogout) bnLogout.onclick = doLogout;
+  const bnPatients = document.getElementById('bn-patients');
+  if (bnPatients) bnPatients.onclick = ()=>{ if (state.view !== 'dashboard') history.back(); else setState({}); };
+  const bnProfile = document.getElementById('bn-profile');
+  if (bnProfile) bnProfile.onclick = ()=> setState({ showProfile:true });
+
+  const profileLogout = document.getElementById('profile-logout-btn');
+  if (profileLogout) profileLogout.onclick = doLogout;
+  const profileSettings = document.getElementById('profile-settings-btn');
+  if (profileSettings) profileSettings.onclick = ()=> setState({ showProfile:false, showSettings:true });
+  const profileClose = document.getElementById('profile-close-btn');
+  if (profileClose) profileClose.onclick = ()=> setState({ showProfile:false });
 
   if (state.showSettings) renderSettingsModal();
 }
@@ -843,13 +898,9 @@ function renderPatientDetail(){
   const photos = filter === 'all' ? state.photos : state.photos.filter(ph => ph.type === filter);
 
   const gridHtml = photos.length ? photos.map(ph => `
-    <div class="photo-card" data-url="${ph.imageUrl}">
+    <div class="photo-card" data-id="${ph.id}">
       <img src="${ph.imageUrl}">
-      <div class="photo-card-body">
-        <span class="timeline-type ${ph.type}" style="margin-inline-start:0;">${typeLabel(ph.type)}</span>
-        <div class="photo-card-date">${fmtDate(ph.timestamp)}</div>
-        ${ph.procedure ? `<div class="photo-card-proc">🏷️ ${ph.procedure}</div>` : ''}
-      </div>
+      <div class="photo-card-dot ${ph.type}"></div>
     </div>
   `).join('') : `<div class="empty-state" style="grid-column:1/-1;"><div class="icon">📷</div><div>لا توجد صور بهذا التصنيف بعد</div></div>`;
 
@@ -894,7 +945,7 @@ function renderPatientDetail(){
   document.getElementById('add-photo-btn').onclick = ()=> setState({ showAddPhotoModal:true });
   document.querySelectorAll('.chip[data-f]').forEach(c=>{ c.onclick = ()=> setState({ photoFilter: c.dataset.f }); });
   document.querySelectorAll('.grid-cols-chip').forEach(c=>{ c.onclick = ()=> setState({ photoGridCols: parseInt(c.dataset.cols,10) }); });
-  document.querySelectorAll('.photo-card').forEach(card=>{ card.onclick = ()=> setState({ lightboxUrl: card.dataset.url }); });
+  document.querySelectorAll('.photo-card').forEach(card=>{ card.onclick = ()=> setState({ lightboxUrl: card.dataset.id }); });
   if (state.showAddPhotoModal) renderAddPhotoModal();
 }
 
