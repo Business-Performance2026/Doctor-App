@@ -208,16 +208,20 @@
   .timeline-note{ font-size:13px; color:var(--text); margin-top:8px; }
   .timeline-proc{ font-size:12px; color:var(--accent); font-weight:700; margin-top:4px; }
 
-  .photo-grid{ display:grid; grid-template-columns:repeat(auto-fill, minmax(190px,1fr)); gap:16px; }
+  .photo-grid{ display:grid; gap:10px; }
   .photo-card{
-    background:var(--surface); border:1.5px solid var(--border); border-radius:16px;
+    position:relative; aspect-ratio:1/1; border-radius:14px;
     overflow:hidden; cursor:pointer; transition:.18s; box-shadow:var(--shadow-sm);
+    border:1.5px solid var(--border); background:var(--bg);
   }
   .photo-card:hover{ border-color:var(--primary-light); transform:translateY(-3px); box-shadow:var(--shadow-md); }
-  .photo-card img{ width:100%; aspect-ratio:1/1; object-fit:cover; display:block; background:var(--bg); }
-  .photo-card-body{ padding:11px 13px; }
-  .photo-card-date{ font-size:11px; color:var(--muted); margin-top:7px; font-weight:500; }
-  .photo-card-proc{ font-size:11.5px; color:var(--accent); font-weight:700; margin-top:5px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .photo-card img{ width:100%; height:100%; object-fit:cover; display:block; }
+  .photo-card-body{
+    position:absolute; inset:auto 0 0 0; padding:8px 9px 7px;
+    background:linear-gradient(to top, rgba(10,36,38,.88), rgba(10,36,38,.35) 65%, rgba(10,36,38,0));
+  }
+  .photo-card-date{ font-size:10px; color:#E8F0EE; margin-top:5px; font-weight:500; }
+  .photo-card-proc{ font-size:10.5px; color:#FFD9B0; font-weight:700; margin-top:2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 
   .lightbox{
     position:fixed; inset:0; background:rgba(0,0,0,.85); z-index:60; display:flex;
@@ -235,13 +239,25 @@
     font-size:13.5px; font-weight:700; z-index:70; box-shadow:0 8px 24px rgba(0,0,0,.2);
   }
 
+  .bottom-nav{ display:none; }
   @media (max-width:720px){
     .app{ flex-direction:column; }
-    .sidebar{ width:100%; flex-direction:row; align-items:center; padding:14px 18px; }
-    .doctor-card{ display:none; }
-    .nav-item span.label{ display:none; }
-    .main{ padding:20px; }
+    .sidebar{ display:none; }
+    .main{ padding:16px; padding-bottom:88px; }
     .patient-header{ flex-direction:column; gap:14px; }
+    .bottom-nav{
+      display:flex; position:fixed; bottom:0; left:0; right:0; z-index:40;
+      background:var(--surface); border-top:1px solid var(--border);
+      box-shadow:0 -4px 16px rgba(15,51,54,.08);
+      padding:6px 4px calc(6px + env(safe-area-inset-bottom));
+    }
+    .bn-item{
+      flex:1; display:flex; flex-direction:column; align-items:center; gap:2px;
+      background:none; border:none; color:var(--muted); font-size:10.5px; font-weight:600;
+      padding:6px 2px; border-radius:10px;
+    }
+    .bn-item .bn-icon{ font-size:19px; line-height:1; }
+    .bn-item.active{ color:var(--primary); }
   }
   .avatar-upload-box{ display:flex; align-items:center; gap:12px; margin-bottom:14px; }
   .avatar-upload-box img{ width:52px; height:52px; border-radius:50%; object-fit:cover; border:2px solid var(--border); }
@@ -583,20 +599,40 @@ function shell(contentHtml){
       </div>
       <div class="main">${contentHtml}</div>
     </div>
+    <div class="bottom-nav">
+      <button class="bn-item ${state.view==='dashboard'?'active':''}" id="bn-home"><span class="bn-icon">🏠</span><span>الرئيسية</span></button>
+      <button class="bn-item" id="bn-add"><span class="bn-icon">➕</span><span>إضافة مريض</span></button>
+      <button class="bn-item" id="bn-settings"><span class="bn-icon">⚙️</span><span>إعدادات</span></button>
+      <button class="bn-item" id="bn-logout"><span class="bn-icon">🚪</span><span>خروج</span></button>
+    </div>
     ${state.toast ? `<div class="toast">${state.toast}</div>` : ''}
     ${state.lightboxUrl ? `<div class="lightbox" id="lightbox"><button class="lightbox-close" id="lb-close">✕</button><img src="${state.lightboxUrl}"></div>` : ''}
-    ${state.showSettings ? '' : ''}
   `;
 }
 function bindShellEvents(){
   const lo = document.getElementById('logout-btn');
-  if (lo) lo.onclick = async ()=>{ await signOut(auth); setState({ view:'login', doctor:null, user:null, patients:[] }); };
+  const doLogout = async ()=>{ await signOut(auth); setState({ view:'login', doctor:null, user:null, patients:[] }); };
+  if (lo) lo.onclick = doLogout;
   const st = document.getElementById('settings-btn');
   if (st) st.onclick = ()=> setState({ showSettings:true });
   const lb = document.getElementById('lb-close');
   if (lb) lb.onclick = ()=> setState({ lightboxUrl:null });
   const lbBg = document.getElementById('lightbox');
   if (lbBg) lbBg.onclick = (e)=>{ if (e.target.id==='lightbox') setState({ lightboxUrl:null }); };
+
+  const bnHome = document.getElementById('bn-home');
+  if (bnHome) bnHome.onclick = ()=>{ if (state.view !== 'dashboard') history.back(); else setState({}); };
+  const bnAdd = document.getElementById('bn-add');
+  if (bnAdd) bnAdd.onclick = ()=>{
+    if (!getApiKey()){ setState({ showSettings:true }); showToast('أدخل مفتاح Anthropic API أول شي من الإعدادات'); return; }
+    if (state.view !== 'dashboard') setState({ view:'dashboard', showAddModal:true });
+    else setState({ showAddModal:true });
+  };
+  const bnSettings = document.getElementById('bn-settings');
+  if (bnSettings) bnSettings.onclick = ()=> setState({ showSettings:true });
+  const bnLogout = document.getElementById('bn-logout');
+  if (bnLogout) bnLogout.onclick = doLogout;
+
   if (state.showSettings) renderSettingsModal();
 }
 
@@ -612,7 +648,7 @@ function patientGridHtml(filtered){
       <div class="patient-avatar">${p.avatarUrl ? `<img src="${p.avatarUrl}" style="width:100%;height:100%;border-radius:50%;object-fit:cover;">` : ((p.name||'؟').trim()[0] || '؟')}</div>
       <div class="patient-name">${p.name}</div>
       <div class="patient-meta">${p.nationalId ? 'هوية: '+p.nationalId : (p.mrn ? 'ملف: '+p.mrn : '')}</div>
-      <div class="patient-meta">${p.dob ? 'الميلاد: '+p.dob : ''}</div>
+      <div class="patient-meta">${p.visitDate ? 'الزيارة: '+p.visitDate : ''}</div>
     </div>
   `).join('') : `
     <div class="empty-state" style="grid-column:1/-1;">
@@ -626,10 +662,16 @@ function bindPatientCards(){
     c.onclick = async ()=>{
       const patient = state.patients.find(p=>p.id===c.dataset.id);
       const photos = await loadPhotos(state.user, patient.id);
+      history.pushState({ appView:'patient' }, '', '#patient');
       setState({ view:'patient', activePatientId: patient.id, activePatient: patient, photos, photoFilter:'all' });
     };
   });
 }
+window.addEventListener('popstate', ()=>{
+  if (state.view === 'patient'){
+    setState({ view:'dashboard' });
+  }
+});
 function updatePatientGrid(){
   const grid = document.querySelector('.patient-grid');
   if (!grid) return;
@@ -689,7 +731,7 @@ function renderAddPatientModal(){
         </div>
         <div class="field"><label>رقم الهوية</label><input id="f-nid" value=""></div>
         <div class="field"><label>رقم الملف الطبي (MRN)</label><input id="f-mrn" value="" placeholder="رقم الملف بالمستشفى إن وجد"></div>
-        <div class="field"><label>تاريخ الميلاد</label><input id="f-dob" type="date" value=""></div>
+        <div class="field"><label>تاريخ الزيارة</label><input id="f-visit-date" type="date" value=""></div>
         <div class="field"><label>الجنس</label>
           <select id="f-gender">
             <option value="">غير محدد</option>
@@ -707,6 +749,8 @@ function renderAddPatientModal(){
     </div>
   `);
   document.getElementById('root').appendChild(overlay);
+  const visitDateInput = document.getElementById('f-visit-date');
+  if (visitDateInput && !visitDateInput.value) visitDateInput.value = new Date().toISOString().slice(0,10);
 
   document.getElementById('scan-trigger').onclick = ()=> document.getElementById('id-file').click();
   document.getElementById('id-file').onchange = async (e)=>{
@@ -721,7 +765,6 @@ function renderAddPatientModal(){
       document.getElementById('f-name').value = fields.full_name || '';
       document.getElementById('f-nid').value = fields.national_id || '';
       document.getElementById('f-mrn').value = fields.medical_record_number || '';
-      document.getElementById('f-dob').value = fields.dob || '';
       document.getElementById('f-phone').value = fields.phone || '';
       if (fields.gender) document.getElementById('f-gender').value = fields.gender.includes('أنث') ? 'أنثى' : 'ذكر';
       scanState.extracting = false; scanState.extracted = true;
@@ -737,8 +780,7 @@ function renderAddPatientModal(){
           document.getElementById('f-name').value = fields.full_name || '';
           document.getElementById('f-nid').value = fields.national_id || '';
           document.getElementById('f-mrn').value = fields.medical_record_number || '';
-          document.getElementById('f-dob').value = fields.dob || '';
-          document.getElementById('f-phone').value = fields.phone || '';
+              document.getElementById('f-phone').value = fields.phone || '';
           if (fields.gender) document.getElementById('f-gender').value = fields.gender.includes('أنث') ? 'أنثى' : 'ذكر';
         }catch(cropErr){ console.error('avatar crop error', cropErr); }
       }
@@ -766,7 +808,7 @@ function renderAddPatientModal(){
         name,
         nationalId: document.getElementById('f-nid').value.trim(),
         mrn: document.getElementById('f-mrn').value.trim(),
-        dob: document.getElementById('f-dob').value.trim(),
+        visitDate: document.getElementById('f-visit-date').value.trim(),
         gender: document.getElementById('f-gender').value,
         phone: document.getElementById('f-phone').value.trim(),
         avatarUrl: null,
@@ -797,6 +839,7 @@ function renderPatientDetail(){
   const p = state.activePatient;
   const filter = state.photoFilter;
   const cols = state.photoGridCols || 4;
+  const actualCols = cols === 4 ? 2 : 3; // ٤ = عمودين (2×2)، ٦ و٩ = ثلاثة أعمدة (3×2 أو 3×3)
   const photos = filter === 'all' ? state.photos : state.photos.filter(ph => ph.type === filter);
 
   const gridHtml = photos.length ? photos.map(ph => `
@@ -820,7 +863,7 @@ function renderPatientDetail(){
           <div class="info-grid">
             <div><span>رقم الهوية</span>${p.nationalId || '—'}</div>
             <div><span>رقم الملف الطبي</span>${p.mrn || '—'}</div>
-            <div><span>تاريخ الميلاد</span>${p.dob || '—'}</div>
+            <div><span>تاريخ الزيارة</span>${p.visitDate || '—'}</div>
             <div><span>الجنس</span>${p.gender || '—'}</div>
             <div><span>الجوال</span>${p.phone || '—'}</div>
           </div>
@@ -844,10 +887,10 @@ function renderPatientDetail(){
       <div class="chip ${filter==='after'?'active':''}" data-f="after">بعد العملية</div>
       <div class="chip ${filter==='symptom'?'active':''}" data-f="symptom">أعراض</div>
     </div>
-    <div class="photo-grid" style="grid-template-columns: repeat(${cols}, 1fr);">${gridHtml}</div>
+    <div class="photo-grid" style="grid-template-columns: repeat(${actualCols}, 1fr);">${gridHtml}</div>
   `);
   bindShellEvents();
-  document.getElementById('back-btn').onclick = ()=> setState({ view:'dashboard' });
+  document.getElementById('back-btn').onclick = ()=> history.back();
   document.getElementById('add-photo-btn').onclick = ()=> setState({ showAddPhotoModal:true });
   document.querySelectorAll('.chip[data-f]').forEach(c=>{ c.onclick = ()=> setState({ photoFilter: c.dataset.f }); });
   document.querySelectorAll('.grid-cols-chip').forEach(c=>{ c.onclick = ()=> setState({ photoGridCols: parseInt(c.dataset.cols,10) }); });
